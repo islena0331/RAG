@@ -4,3 +4,5 @@ pdf2image
 Pillow
 pymongo
 python-dotenv
+sentence-transformers
+qdrant-client
