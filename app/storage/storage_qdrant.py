@@ -18,7 +18,6 @@ PAYLOAD_FIELDS = (
     "labels",
     "extraction_method",
     "is_noisy",
-    "is_title",
     "created_at",
 )
 

@@ -5,7 +5,7 @@
 
 from app.services.chunking.models import ChunkingResult, SkippedPage
 from app.services.chunking.pipeline import create_chunks, create_chunks_with_report
-from app.services.chunking.quality import is_noisy_text, is_title_text
+from app.services.chunking.quality import is_noisy_text
 from app.services.chunking.splitter import split_text
 
 # 청킹 모듈 공개
@@ -15,6 +15,5 @@ __all__ = [
     "create_chunks",
     "create_chunks_with_report",
     "is_noisy_text",
-    "is_title_text",
     "split_text",
 ]

@@ -10,6 +10,36 @@ def _serialize_chunk(chunk: RagChunk) -> dict[str, object]:
     return dataclass_to_dict(chunk)
 
 
+# 문서 제목 조회
+def get_document_titles(
+    document_ids: set[str],
+    mongodb_url: str = MONGODB_URL,
+    database_name: str = MONGODB_DB_NAME,
+) -> dict[str, str]:
+    if not document_ids:
+        return {}
+
+    client: MongoClient | None = None
+    try:
+        client = MongoClient(mongodb_url, serverSelectionTimeoutMS=3000)
+        collection = client[database_name]["rag_documents"]
+        documents = collection.find(
+            {"document_id": {"$in": list(document_ids)}},
+            {"document_id": 1, "title": 1},
+        )
+        return {
+            str(document["document_id"]): str(document["title"]).strip()
+            for document in documents
+            if document.get("document_id") and str(document.get("title", "")).strip()
+        }
+    except PyMongoError as error:
+        print(f"경고: MongoDB 문서 제목 조회에 실패했습니다: {error}")
+        return {}
+    finally:
+        if client is not None:
+            client.close()
+
+
 def save_to_mongodb(
     document: DocumentMetadata,
     chunks: list[RagChunk],

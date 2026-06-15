@@ -1,148 +1,111 @@
 ## 설치
 
-```powershell
 python -m venv .venv-rag
 .\.venv-rag\Scripts\Activate.ps1
 python -m pip install -r requirements-rag.txt
 Copy-Item .env.example .env
-```
 
-OCR 사용 시 별도 설치 필요
-- Tesseract OCR
-- Poppler
+OCR을 사용하려면 Tesseract OCR, Poppler 설치 필요
 
 
 
-## MongoDB 실행
+## 실행 준비
 
-```powershell
-docker run -d --name rag-mongodb -p 27018:27017 -v rag_mongodb_storage:/data/db mongo
-```
+MongoDB URL: `mongodb://localhost:27018`
 
-기존 컨테이너 실행
-```powershell
-docker start rag-mongodb
-```
+MongoDB:
+docker run -d --name rag-mongo -p 27018:27017 -v rag_mongodb_storage:/data/db mongo
 
-## Qdrant 실행
-
-```powershell
+Qdrant:
 docker run -d --name rag-qdrant -p 6333:6333 -p 6334:6334 -v rag_qdrant_storage:/qdrant/storage qdrant/qdrant
-```
 
-기존 컨테이너 실행
-```powershell
-docker start rag-qdrant
-```
+기존 컨테이너 실행:
+docker start rag-mongo rag-qdrant
 
-Dashboard
-```text
+Qdrant Dashboard:
 http://localhost:6333/dashboard
-```
 
-## PDF 전처리
 
-JSON 저장
-```powershell
-python main.py --file docs/test.pdf --title "테스트 문서" --security-level 2 --labels 작전,장비 --ocr off --storage json
-```
 
-JSON과 MongoDB 저장
-```powershell
-python main.py --file docs/test.pdf --title "테스트 문서" --security-level 2 --labels 작전,장비 --ocr off --storage both
-```
 
-OCR 모드
-- `off`: pypdf만 사용
-- `auto`: 텍스트가 부족한 페이지만 OCR
+## 환경변수
+
+주요 설정:
+| 설정 | 기본값 | 용도 |
+| `OPENAI_MODEL` | `gpt-4o-mini` | 답변 모델 |
+| `RAG_TOP_K` | `5` | 최종 검색 청크 수 |
+| `RAG_SCORE_THRESHOLD` | 빈 값 | 최소 검색 점수 |
+| `RAG_MAX_CONTEXT_TOKENS` | `12000` | 문서 context 상한 |
+| `RAG_MAX_CHUNKS_PER_DOCUMENT` | `2` | 문서별 우선 선택 수 |
+
+
+
+## 구조
+
+- `ingest.py`: PDF 적재 전체 실행
+- `rag_answer.py`: 검색과 답변 실행
+- `scripts/`: 단계별 실행과 점검 명령
+- `app/core/`: 설정과 공통 구조
+- `app/services/`: 전처리, 임베딩, 검색, 답변 로직
+- `app/storage/`: JSON, MongoDB, Qdrant 저장
+
+
+
+## 사용 순서
+
+### 1. 전체 적재
+
+python ingest.py --file docs/test.pdf --title "테스트 문서" --security-level 2 --labels 작전,장비 --ocr off
+
+처리 순서:
+- PDF 텍스트 추출
+- 텍스트 정제와 청킹
+- JSON과 MongoDB 저장
+- 임베딩 생성
+- Qdrant 저장
+
+OCR 모드:
+- `off`: PDF 텍스트만 사용
+- `auto`: 필요한 페이지만 OCR
 - `force`: 모든 페이지 OCR
 
-## 임베딩
 
-BAAI/bge-m3 모델은 첫 실행 시 자동으로 다운로드됨
-첫 실행은 오래 걸릴 수 있으며 이후에는 로컬 캐시 사용
+### 2. RAG 질의
 
-20개 테스트
-```powershell
-python embed_to_qdrant.py --limit 20
-```
+python rag_answer.py --query "북한의 핵전략은 무엇인가?" --user-security-level 2
 
-전체 임베딩
-```powershell
-python embed_to_qdrant.py
-```
+API 호출 없이 검색 결과 확인:
+python rag_answer.py --query "북한의 핵전략은 무엇인가?" --user-security-level 2 --dry-run --show-context
 
-특정 문서
-```powershell
-python embed_to_qdrant.py --document-id 문서ID
-```
+검색 설정 변경:
+python rag_answer.py --query "질문" --user-security-level 2 --top-k 3 --score-threshold 0.5
 
-선택 옵션
-```powershell
-python embed_to_qdrant.py --include-noisy
-python embed_to_qdrant.py --include-title
-python embed_to_qdrant.py --force
-python embed_to_qdrant.py --recreate-collection
-```
 
-기본 제외 대상
-- `is_noisy=true`
-- `is_title=true`
-- 현재 모델로 이미 임베딩된 chunk
-- 빈 `chunk_text`
 
-## 검색
+## 개별 실행
 
-```powershell
-python search_qdrant.py --query "북한 핵전략은 무엇인가?"
-python search_qdrant.py --query "확장억제" --top-k 5
-python search_qdrant.py --query "북한 비핵화 노력" --security-level 2
-```
+PDF 저장만 실행:
+python -m scripts.preprocess_pdf --file docs/test.pdf --title "테스트 문서" --security-level 2 --labels 작전,장비 --ocr off --storage both
 
-## 저장 역할
+Qdrant 임베딩만 실행:
 
-MongoDB
-- 문서 metadata
-- chunk 원문
-- `page_numbers`, `security_level`, `labels`
-- `is_noisy`, `is_title`
-- 임베딩 완료 상태와 모델 정보
+테스트:
+python -m scripts.embed_to_qdrant --limit 20
 
-Qdrant
-- chunk embedding vector
-- 검색용 payload
-- cosine similarity search
+전체:
+python -m scripts.embed_to_qdrant
 
-Embedding vector는 MongoDB에 저장하지 않음
+특정 문서:
+python -m scripts.embed_to_qdrant --document-id 문서ID
 
-## MongoDB 임베딩 상태 필드
+이미 임베딩된 청크는 건너뜀
 
-```json
-{
-  "embedded": true,
-  "embedded_at": "...",
-  "embedding_model": "BAAI/bge-m3",
-  "vector_db": "qdrant",
-  "qdrant_collection": "rag_chunks_bge_m3",
-  "vector_id": "chunk_id"
-}
-```
-## Qdrant payload
+Qdrant 검색만 확인:
+python -m scripts.search_qdrant --query "질문" --security-level 2
 
-```json
-{
-  "chunk_id": "...",
-  "document_id": "...",
-  "chunk_index": 0,
-  "chunk_text": "...",
-  "page_number": 2,
-  "page_numbers": [1, 2],
-  "security_level": 2,
-  "labels": ["작전", "장비"],
-  "extraction_method": "pypdf",
-  "is_noisy": false,
-  "is_title": false,
-  "created_at": "...",
-  "embedding_model": "BAAI/bge-m3"
-}
-```
+
+## 기타
+
+- `--include-noisy`: noisy 청크 포함
+- `--debug`: 토큰과 제외 source 출력
+- `--guard-on`: guardrail 연결점 실행

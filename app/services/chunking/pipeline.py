@@ -1,4 +1,3 @@
-from dataclasses import replace
 from datetime import datetime, timezone
 from uuid import uuid4
 
@@ -9,8 +8,6 @@ from app.services.chunking.models import ChunkDraft, ChunkingResult, SkippedPage
 from app.services.chunking.quality import (
     SHORT_CHUNK_THRESHOLD,
     is_noisy_text,
-    is_title_text,
-    should_merge_short_with_next,
 )
 from app.services.chunking.splitter import PARAGRAPH_SEPARATOR, split_text
 
@@ -51,7 +48,6 @@ def _page_drafts(
                     page_number=page.page_number,
                     page_numbers=[page.page_number],
                     extraction_method=page.extraction_method,
-                    is_title=True,
                 )
             )
             continue
@@ -72,7 +68,6 @@ def _page_drafts(
                 page_number=page.page_number,
                 page_numbers=[page.page_number],
                 extraction_method=page.extraction_method,
-                is_title=False,
             )
             for chunk_text in page_chunks
         )
@@ -94,12 +89,8 @@ def _merge_short_drafts(drafts: list[ChunkDraft]) -> list[ChunkDraft]:
 
         next_draft = drafts[index + 1]
         pages_are_adjacent = next_draft.page_number == current.page_numbers[-1] + 1
-        can_merge = pages_are_adjacent and should_merge_short_with_next(
-            current.text,
-            next_draft.text,
-        )
-        if not can_merge:
-            merged.append(replace(current, is_title=True))
+        if not pages_are_adjacent:
+            merged.append(current)
             index += 1
             continue
 
@@ -114,8 +105,6 @@ def _merge_short_drafts(drafts: list[ChunkDraft]) -> list[ChunkDraft]:
             extraction_method=_merge_extraction_methods(
                 [current.extraction_method, next_draft.extraction_method]
             ),
-            is_title=len(combined_text) < SHORT_CHUNK_THRESHOLD
-            and is_title_text(combined_text),
         )
         drafts[index + 1] = combined
         index += 1
@@ -144,7 +133,6 @@ def _to_rag_chunks(
                 labels=list(labels),
                 extraction_method=draft.extraction_method,
                 is_noisy=is_noisy_text(draft.text),
-                is_title=draft.is_title,
                 created_at=datetime.now(timezone.utc).isoformat(),
             )
         )

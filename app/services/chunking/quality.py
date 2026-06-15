@@ -7,55 +7,6 @@ STRUCTURE_DELIMITER = re.compile(r"[,;|/\\]")
 NUMBER_TOKEN = re.compile(r"(?<!\w)\d+(?:[.,]\d+)*(?!\w)")
 WORD_TOKEN = re.compile(r"[가-힣A-Za-z0-9]+")
 KOREAN_NAME_WITH_NUMBER = re.compile(r"[가-힣]{2,4}\s*\(\d{2,4}\)")
-TITLE_KEYWORD = re.compile(
-    r"(?:제\d+[장절]|목차|제목|주제|리포트|보고서|강의|수업|순서|개요|"
-    r"평가|대응태세|핵심\s*내용|작성\s*방법|출처)"
-)
-COMMON_WORDS = {
-    "그리고",
-    "대한",
-    "관련",
-    "내용",
-    "위한",
-    "이번",
-    "페이지",
-    "최근",
-}
-
-
-# 의미 단어 추출
-def meaningful_tokens(text: str) -> set[str]:
-    return {
-        token.lower()
-        for token in WORD_TOKEN.findall(text)
-        if len(token) >= 2 and token.lower() not in COMMON_WORDS
-    }
-
-
-# 제목 판정
-def is_title_text(text: str) -> bool:
-    normalized = " ".join(text.split())
-    if not normalized or len(normalized) >= SHORT_CHUNK_THRESHOLD:
-        return False
-
-    sentence_endings = len(re.findall(r"[.!?。！？]", normalized))
-    word_count = len(WORD_TOKEN.findall(normalized))
-    return bool(TITLE_KEYWORD.search(normalized)) or (
-        sentence_endings <= 1 and word_count <= 18
-    )
-
-
-# 짧은 청크 병합 판정
-def should_merge_short_with_next(short_text: str, next_text: str) -> bool:
-    if not is_title_text(short_text):
-        return True
-
-    short_tokens = meaningful_tokens(short_text)
-    next_tokens = meaningful_tokens(next_text[:500])
-    shared_tokens = short_tokens & next_tokens
-
-    required_overlap = 1 if len(short_tokens) <= 4 else 2
-    return len(shared_tokens) >= required_overlap
 
 
 # noisy 판정

@@ -8,6 +8,9 @@ from dotenv import load_dotenv
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 load_dotenv(PROJECT_ROOT / ".env")
 
+GPT_4O_MINI_CONTEXT_WINDOW = 128000
+GPT_4O_MINI_MAX_OUTPUT_TOKENS = 16384
+
 
 def _read_int(name: str, default: int) -> int:
     raw_value = os.getenv(name)
@@ -19,6 +22,30 @@ def _read_int(name: str, default: int) -> int:
     except ValueError:
         print(f"경고: {name} 값이 정수가 아니므로 기본값 {default}을 사용합니다.")
         return default
+
+
+def _read_float(name: str, default: float) -> float:
+    raw_value = os.getenv(name)
+    if raw_value is None or not raw_value.strip():
+        return default
+
+    try:
+        return float(raw_value)
+    except ValueError:
+        print(f"경고: {name} 값이 숫자가 아니므로 기본값 {default}을 사용합니다.")
+        return default
+
+
+def _read_optional_float(name: str) -> float | None:
+    raw_value = os.getenv(name)
+    if raw_value is None or not raw_value.strip():
+        return None
+
+    try:
+        return float(raw_value)
+    except ValueError:
+        print(f"경고: {name} 값이 숫자가 아니므로 설정을 적용하지 않습니다.")
+        return None
 
 
 def _read_bool(name: str, default: bool) -> bool:
@@ -60,7 +87,16 @@ class Settings:
     embedding_batch_size: int
     embedding_normalize: bool
     embed_skip_noisy: bool
-    embed_skip_title: bool
+    openai_api_key: str
+    openai_model: str
+    openai_max_output_tokens: int
+    openai_timeout_seconds: float
+    openai_max_retries: int
+    rag_top_k: int
+    rag_score_threshold: float | None
+    rag_max_input_tokens: int
+    rag_max_context_tokens: int
+    rag_max_chunks_per_document: int
 
 
 SETTINGS = Settings(
@@ -85,7 +121,20 @@ SETTINGS = Settings(
     embedding_batch_size=_read_int("EMBEDDING_BATCH_SIZE", 4),
     embedding_normalize=_read_bool("EMBEDDING_NORMALIZE", True),
     embed_skip_noisy=_read_bool("EMBED_SKIP_NOISY", True),
-    embed_skip_title=_read_bool("EMBED_SKIP_TITLE", True),
+    openai_api_key=os.getenv("OPENAI_API_KEY", "").strip(),
+    openai_model=os.getenv("OPENAI_MODEL", "gpt-4o-mini").strip()
+    or "gpt-4o-mini",
+    openai_max_output_tokens=_read_int("OPENAI_MAX_OUTPUT_TOKENS", 1200),
+    openai_timeout_seconds=_read_float("OPENAI_TIMEOUT_SECONDS", 60.0),
+    openai_max_retries=_read_int("OPENAI_MAX_RETRIES", 2),
+    rag_top_k=_read_int("RAG_TOP_K", 5),
+    rag_score_threshold=_read_optional_float("RAG_SCORE_THRESHOLD"),
+    rag_max_input_tokens=_read_int("RAG_MAX_INPUT_TOKENS", 16000),
+    rag_max_context_tokens=_read_int("RAG_MAX_CONTEXT_TOKENS", 12000),
+    rag_max_chunks_per_document=_read_int(
+        "RAG_MAX_CHUNKS_PER_DOCUMENT",
+        2,
+    ),
 )
 
 MONGODB_URL = SETTINGS.mongodb_url
@@ -103,4 +152,13 @@ EMBEDDING_MODEL_NAME = SETTINGS.embedding_model_name
 EMBEDDING_BATCH_SIZE = SETTINGS.embedding_batch_size
 EMBEDDING_NORMALIZE = SETTINGS.embedding_normalize
 EMBED_SKIP_NOISY = SETTINGS.embed_skip_noisy
-EMBED_SKIP_TITLE = SETTINGS.embed_skip_title
+OPENAI_API_KEY = SETTINGS.openai_api_key
+OPENAI_MODEL = SETTINGS.openai_model
+OPENAI_MAX_OUTPUT_TOKENS = SETTINGS.openai_max_output_tokens
+OPENAI_TIMEOUT_SECONDS = SETTINGS.openai_timeout_seconds
+OPENAI_MAX_RETRIES = SETTINGS.openai_max_retries
+RAG_TOP_K = SETTINGS.rag_top_k
+RAG_SCORE_THRESHOLD = SETTINGS.rag_score_threshold
+RAG_MAX_INPUT_TOKENS = SETTINGS.rag_max_input_tokens
+RAG_MAX_CONTEXT_TOKENS = SETTINGS.rag_max_context_tokens
+RAG_MAX_CHUNKS_PER_DOCUMENT = SETTINGS.rag_max_chunks_per_document

@@ -35,8 +35,41 @@ class RagChunk:
     labels: list[str]
     extraction_method: str
     is_noisy: bool
-    is_title: bool
     created_at: str
+
+
+@dataclass(frozen=True)
+class RetrievedChunk:
+    source_id: str
+    chunk_id: str
+    document_id: str
+    document_title: str
+    chunk_text: str
+    page_numbers: list[int]
+    score: float
+    security_level: int
+    labels: list[str]
+
+
+@dataclass(frozen=True)
+class PromptBundle:
+    developer_prompt: str
+    user_prompt: str
+    sources: list[RetrievedChunk]
+    input_token_count: int
+    context_token_count: int
+    excluded_sources: list[str]
+    truncated_sources: list[str]
+
+
+@dataclass(frozen=True)
+class LlmResult:
+    answer: str
+    model: str
+    input_tokens: int | None
+    output_tokens: int | None
+    total_tokens: int | None
+    request_id: str | None
 
 
 # dataclass 변환

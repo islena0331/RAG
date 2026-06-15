@@ -67,7 +67,6 @@ def print_results(points: list) -> None:
             + json.dumps(payload.get("labels", []), ensure_ascii=False)
         )
         print(f"is_noisy: {payload.get('is_noisy')}")
-        print(f"is_title: {payload.get('is_title')}")
         print(f"chunk_text: {chunk_text[:300]}")
 
 

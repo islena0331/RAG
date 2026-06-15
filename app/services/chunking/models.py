@@ -23,4 +23,3 @@ class ChunkDraft:
     page_number: int
     page_numbers: list[int]
     extraction_method: str
-    is_title: bool
