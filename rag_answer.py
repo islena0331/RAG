@@ -3,6 +3,7 @@ import re
 import sys
 
 from app.core.config import (
+    RAG_FALLBACK_SCORE_THRESHOLD,
     RAG_SCORE_THRESHOLD,
     RAG_TOP_K,
 )
@@ -15,7 +16,10 @@ from app.services.guardrails import (
     check_output_guardrail,
 )
 from app.services.llm_client import LlmClientError, generate_answer
-from app.services.prompt_builder import build_prompt_bundle
+from app.services.prompt_builder import (
+    build_general_prompt_bundle,
+    build_prompt_bundle,
+)
 from app.services.rag_presenter import (
     print_answer,
     print_dry_run,
@@ -123,36 +127,41 @@ def run(args: argparse.Namespace) -> int:
             return 0
 
     retriever = Retriever()
-    sources = retriever.retrieve(
-        query=query,
-        top_k=args.top_k,
-        user_security_level=user_security_level,
-        score_threshold=args.score_threshold,
-        include_noisy=args.include_noisy,
-    )
-    if not sources:
-        record_rag_run(
-            status="no_results",
+    try:
+        sources = retriever.retrieve(
+            query=query,
+            top_k=args.top_k,
             user_security_level=user_security_level,
-            allowed_document_levels=allowed_levels,
-            dry_run=args.dry_run,
-            guard_on=args.guard_on,
+            score_threshold=args.score_threshold,
+            include_noisy=args.include_noisy,
         )
-        print("관련 문서를 찾지 못했습니다.")
-        return 0
+    except ValueError as error:
+        if "Qdrant collection이 없습니다" not in str(error):
+            raise
+        sources = []
 
-    bundle = build_prompt_bundle(
-        query=query,
-        sources=sources,
-        user_security_level=user_security_level,
-    )
+    if (
+        sources
+        and max(source.score for source in sources) < RAG_FALLBACK_SCORE_THRESHOLD
+    ):
+        sources = []
+
+    if sources:
+        bundle = build_prompt_bundle(
+            query=query,
+            sources=sources,
+            user_security_level=user_security_level,
+        )
+    else:
+        bundle = build_general_prompt_bundle(query=query)
+
     if args.dry_run:
         log_path = record_rag_run(
             status="dry_run",
             user_security_level=user_security_level,
             allowed_document_levels=allowed_levels,
             sources=bundle.sources,
-            dry_run=True,
+            dry_run=args.dry_run,
             guard_on=args.guard_on,
         )
         print_dry_run(
@@ -169,7 +178,7 @@ def run(args: argparse.Namespace) -> int:
         )
         return 0
 
-    if args.show_context:
+    if args.show_context and bundle.sources:
         print("[검색 context]")
         print_retrieved_chunks(bundle.sources, True, args.debug)
 
@@ -192,7 +201,7 @@ def run(args: argparse.Namespace) -> int:
             return 0
 
     log_path = record_rag_run(
-        status="completed",
+        status="completed" if bundle.sources else "completed_without_sources",
         user_security_level=user_security_level,
         allowed_document_levels=allowed_levels,
         sources=bundle.sources,

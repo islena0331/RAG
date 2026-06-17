@@ -20,6 +20,23 @@ def format_pages(page_numbers: list[int]) -> str:
     return ", ".join(str(page) for page in page_numbers) + "페이지"
 
 
+# 등급 표시
+def _format_levels(levels: list[int]) -> str:
+    return ", ".join(f"{level}급" for level in sorted(set(levels)))
+
+
+# 답변 등급 정보 출력
+def print_grade_info(
+    user_security_level: int,
+    sources: list[RetrievedChunk],
+) -> None:
+    print("\n[등급 정보]")
+    print(f"사용자 등급: {user_security_level}급")
+    if sources:
+        document_levels = [source.security_level for source in sources]
+        print(f"문서 등급: {_format_levels(document_levels)}")
+
+
 # 검색 결과 출력
 def print_retrieved_chunks(
     sources: list[RetrievedChunk],
@@ -46,6 +63,9 @@ def print_retrieved_chunks(
 
 # 출처 목록 출력
 def print_sources(sources: list[RetrievedChunk]) -> None:
+    if not sources:
+        return
+
     print("\n[출처]")
     for source in sources:
         print(
@@ -77,6 +97,22 @@ def print_dry_run(
     debug: bool,
     log_path: Path | None,
 ) -> None:
+    if not bundle.sources:
+        print("[질문]")
+        print(query)
+        print(f"\n전체 예상 입력 토큰 수: {bundle.input_token_count}")
+        print("\n[Developer Prompt]")
+        print(bundle.developer_prompt)
+        print("\n[User Prompt]")
+        print(bundle.user_prompt)
+        if debug:
+            print("\n[Debug]")
+            print(f"OPENAI_MAX_OUTPUT_TOKENS: {OPENAI_MAX_OUTPUT_TOKENS}")
+            print(f"guardrail 연결: {guard_on}")
+            if log_path is not None:
+                print(f"실행 기록: {log_path}")
+        return
+
     print("[RAG 검색 정보]")
     print(f"질문: {query}")
     print(f"임베딩 모델: {EMBEDDING_MODEL_NAME}")
@@ -125,15 +161,17 @@ def print_answer(
     debug: bool,
     log_path: Path | None,
 ) -> list[str]:
-    print("[RAG 질문]")
+    print("[질문]")
     print(query)
-    print("\n[RAG 답변]")
+    print_grade_info(user_security_level, bundle.sources)
+    print("\n[답변]")
     print(result.answer)
     print_sources(bundle.sources)
 
     print("\n[사용 정보]")
     print(f"모델: {result.model}")
-    print(f"검색 chunk 수: {len(bundle.sources)}")
+    if bundle.sources or debug:
+        print(f"검색 chunk 수: {len(bundle.sources)}")
     if result.input_tokens is not None:
         print(f"입력 토큰: {result.input_tokens}")
     if result.output_tokens is not None:

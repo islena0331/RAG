@@ -94,6 +94,7 @@ class Settings:
     openai_max_retries: int
     rag_top_k: int
     rag_score_threshold: float | None
+    rag_fallback_score_threshold: float
     rag_max_input_tokens: int
     rag_max_context_tokens: int
     rag_max_chunks_per_document: int
@@ -129,6 +130,10 @@ SETTINGS = Settings(
     openai_max_retries=_read_int("OPENAI_MAX_RETRIES", 2),
     rag_top_k=_read_int("RAG_TOP_K", 5),
     rag_score_threshold=_read_optional_float("RAG_SCORE_THRESHOLD"),
+    rag_fallback_score_threshold=_read_float(
+        "RAG_FALLBACK_SCORE_THRESHOLD",
+        0.5,
+    ),
     rag_max_input_tokens=_read_int("RAG_MAX_INPUT_TOKENS", 16000),
     rag_max_context_tokens=_read_int("RAG_MAX_CONTEXT_TOKENS", 12000),
     rag_max_chunks_per_document=_read_int(
@@ -159,6 +164,7 @@ OPENAI_TIMEOUT_SECONDS = SETTINGS.openai_timeout_seconds
 OPENAI_MAX_RETRIES = SETTINGS.openai_max_retries
 RAG_TOP_K = SETTINGS.rag_top_k
 RAG_SCORE_THRESHOLD = SETTINGS.rag_score_threshold
+RAG_FALLBACK_SCORE_THRESHOLD = SETTINGS.rag_fallback_score_threshold
 RAG_MAX_INPUT_TOKENS = SETTINGS.rag_max_input_tokens
 RAG_MAX_CONTEXT_TOKENS = SETTINGS.rag_max_context_tokens
 RAG_MAX_CHUNKS_PER_DOCUMENT = SETTINGS.rag_max_chunks_per_document

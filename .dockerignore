@@ -1,0 +1,9 @@
+.git
+.venv-rag
+__pycache__
+*.py[cod]
+.env
+outputs
+.pytest_cache
+.mypy_cache
+.ruff_cache

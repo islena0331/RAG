@@ -24,6 +24,9 @@ from app.services.token_budget import (
 DEVELOPER_PROMPT_PATH = (
     PROJECT_ROOT / "app" / "prompts" / "rag_developer_prompt.txt"
 )
+GENERAL_DEVELOPER_PROMPT_PATH = (
+    PROJECT_ROOT / "app" / "prompts" / "general_developer_prompt.txt"
+)
 MODEL_LIMITS = {
     "gpt-4o-mini": (
         GPT_4O_MINI_CONTEXT_WINDOW,
@@ -85,6 +88,37 @@ def _build_user_prompt(
         "</user_question>"
     )
     return user_prompt, documents_xml
+
+
+# 일반 질문 prompt 생성
+def build_general_prompt_bundle(
+    query: str,
+    model_name: str = OPENAI_MODEL,
+) -> PromptBundle:
+    normalized_query = " ".join(query.split())
+    if not normalized_query:
+        raise ValueError("질문을 입력해주세요.")
+
+    developer_prompt = load_developer_prompt(GENERAL_DEVELOPER_PROMPT_PATH)
+    user_prompt = (
+        "<user_question>\n"
+        f"{escape(normalized_query)}\n"
+        "</user_question>"
+    )
+    input_token_count = count_tokens(
+        developer_prompt + "\n" + user_prompt,
+        model_name,
+    )
+
+    return PromptBundle(
+        developer_prompt=developer_prompt,
+        user_prompt=user_prompt,
+        sources=[],
+        input_token_count=input_token_count,
+        context_token_count=0,
+        excluded_sources=[],
+        truncated_sources=[],
+    )
 
 
 # RAG prompt 묶음 생성
