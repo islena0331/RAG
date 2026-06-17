@@ -37,6 +37,13 @@ docker compose down
 DB까지 삭제:
 docker compose down -v
 
+OpenAI API를 사용하려면 `.env.docker`의 `OPENAI_API_KEY` 값 설정 필요
+
+Hugging Face 제한을 줄이려면 `.env.docker`의 `HF_TOKEN` 값 설정 권장
+
+PowerShell 단축 실행:
+.\scripts\docker_ingest.ps1
+.\scripts\docker_answer.ps1 -Query "북한의 핵전략은 무엇인가?"
 
 첫 빌드와 첫 임베딩은 Python 패키지와 embedding model 다운로드로 오래 걸릴 수 있음
 
@@ -147,4 +154,7 @@ python -m scripts.search_qdrant --query "질문" --security-level 2
 - `--debug`: 토큰과 제외 source 출력
 - `--guard-on`: guardrail 연결점 실행
 - 검색 문서가 없으면 일반 답변으로 처리
+- 일상 질문은 문서 검색 전에 일반 답변으로 처리
+- 문서 검색 점수가 낮으면 일반 답변으로 처리
+- 최종 출처는 답변에 실제 인용된 source만 표시
 - 일반 출력에는 권한과 답변 전환 사유 미표시

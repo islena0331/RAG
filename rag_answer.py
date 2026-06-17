@@ -1,6 +1,7 @@
 import argparse
 import re
 import sys
+from time import perf_counter
 
 from app.core.config import (
     RAG_FALLBACK_SCORE_THRESHOLD,
@@ -20,6 +21,7 @@ from app.services.prompt_builder import (
     build_general_prompt_bundle,
     build_prompt_bundle,
 )
+from app.services.question_router import should_skip_retrieval
 from app.services.rag_presenter import (
     print_answer,
     print_dry_run,
@@ -106,6 +108,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 # RAG 실행
 def run(args: argparse.Namespace) -> int:
+    started_at = perf_counter()
     query = re.sub(r"\s+", " ", args.query).strip()
     if not query:
         raise ValueError("질문을 입력해주세요.")
@@ -126,25 +129,32 @@ def run(args: argparse.Namespace) -> int:
             print(input_guard.reason or "입력 guardrail에서 차단되었습니다.")
             return 0
 
-    retriever = Retriever()
-    try:
-        sources = retriever.retrieve(
-            query=query,
-            top_k=args.top_k,
-            user_security_level=user_security_level,
-            score_threshold=args.score_threshold,
-            include_noisy=args.include_noisy,
-        )
-    except ValueError as error:
-        if "Qdrant collection이 없습니다" not in str(error):
-            raise
-        sources = []
+    sources = []
+    answer_mode = "general"
+    top_score: float | None = None
+    skip_retrieval = should_skip_retrieval(query)
 
-    if (
-        sources
-        and max(source.score for source in sources) < RAG_FALLBACK_SCORE_THRESHOLD
-    ):
+    if not skip_retrieval:
+        retriever = Retriever()
+        try:
+            sources = retriever.retrieve(
+                query=query,
+                top_k=args.top_k,
+                user_security_level=user_security_level,
+                score_threshold=args.score_threshold,
+                include_noisy=args.include_noisy,
+            )
+        except ValueError as error:
+            if "Qdrant collection이 없습니다" not in str(error):
+                raise
+            sources = []
+
+    if sources:
+        top_score = max(source.score for source in sources)
+        answer_mode = "rag"
+    if sources and top_score is not None and top_score < RAG_FALLBACK_SCORE_THRESHOLD:
         sources = []
+        answer_mode = "general"
 
     if sources:
         bundle = build_prompt_bundle(
@@ -163,6 +173,9 @@ def run(args: argparse.Namespace) -> int:
             sources=bundle.sources,
             dry_run=args.dry_run,
             guard_on=args.guard_on,
+            answer_mode=answer_mode,
+            top_score=top_score,
+            elapsed_ms=(perf_counter() - started_at) * 1000,
         )
         print_dry_run(
             query=query,
@@ -196,6 +209,9 @@ def run(args: argparse.Namespace) -> int:
                 sources=bundle.sources,
                 guard_on=True,
                 llm_result=result,
+                answer_mode=answer_mode,
+                top_score=top_score,
+                elapsed_ms=(perf_counter() - started_at) * 1000,
             )
             print(output_guard.reason or "출력 guardrail에서 차단되었습니다.")
             return 0
@@ -207,6 +223,9 @@ def run(args: argparse.Namespace) -> int:
         sources=bundle.sources,
         guard_on=args.guard_on,
         llm_result=result,
+        answer_mode=answer_mode,
+        top_score=top_score,
+        elapsed_ms=(perf_counter() - started_at) * 1000,
     )
 
     unknown_citations = print_answer(
@@ -233,13 +252,15 @@ def main() -> int:
     args = build_parser().parse_args()
     try:
         return run(args)
-    except (
-        ConnectionError,
-        LlmClientError,
-        PermissionError,
-        RuntimeError,
-        ValueError,
-    ) as error:
+    except ConnectionError as error:
+        print(
+            "오류: 벡터 DB에 연결할 수 없습니다. "
+            "`docker compose up -d qdrant` 실행 후 다시 시도해주세요. "
+            f"상세: {error}",
+            file=sys.stderr,
+        )
+        return 1
+    except (LlmClientError, PermissionError, RuntimeError, ValueError) as error:
         print(f"오류: {error}", file=sys.stderr)
         return 1
     except KeyboardInterrupt:

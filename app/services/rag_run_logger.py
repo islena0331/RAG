@@ -20,6 +20,9 @@ def record_rag_run(
     guard_on: bool = False,
     llm_result: LlmResult | None = None,
     error_type: str | None = None,
+    answer_mode: str | None = None,
+    top_score: float | None = None,
+    elapsed_ms: float | None = None,
     log_path: Path = RAG_RUN_LOG_PATH,
 ) -> Path | None:
     source_items = sources or []
@@ -36,6 +39,9 @@ def record_rag_run(
         "dry_run": dry_run,
         "guard_on": guard_on,
         "error_type": error_type,
+        "answer_mode": answer_mode,
+        "top_score": top_score,
+        "elapsed_ms": round(elapsed_ms, 2) if elapsed_ms is not None else None,
     }
 
     if llm_result is not None:

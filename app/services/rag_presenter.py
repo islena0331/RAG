@@ -84,6 +84,17 @@ def find_unknown_citations(
     return sorted(cited_ids - valid_ids)
 
 
+# 답변에 인용된 출처 선택
+def select_cited_sources(
+    answer: str,
+    sources: list[RetrievedChunk],
+) -> list[RetrievedChunk]:
+    cited_ids = set(re.findall(r"\[(S\d+)\]", answer))
+    if not cited_ids:
+        return []
+    return [source for source in sources if source.source_id in cited_ids]
+
+
 # dry-run 출력
 def print_dry_run(
     query: str,
@@ -166,7 +177,7 @@ def print_answer(
     print_grade_info(user_security_level, bundle.sources)
     print("\n[답변]")
     print(result.answer)
-    print_sources(bundle.sources)
+    print_sources(select_cited_sources(result.answer, bundle.sources))
 
     print("\n[사용 정보]")
     print(f"모델: {result.model}")

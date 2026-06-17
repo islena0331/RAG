@@ -26,10 +26,8 @@ services:
     volumes:
       - ./docs:/app/docs:ro
       - ./outputs:/app/outputs
-      - rag_hf_cache:/cache
     command: ["tail", "-f", "/dev/null"]
 
 volumes:
   rag_mongodb_storage:
   rag_qdrant_storage:
-  rag_hf_cache:

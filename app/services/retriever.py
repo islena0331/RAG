@@ -29,6 +29,24 @@ def normalize_chunk_text(text: str) -> str:
     return normalized
 
 
+# 질의 토큰 추출
+def _query_terms(query: str) -> set[str]:
+    terms = set(re.findall(r"[가-힣A-Za-z0-9]{2,}", query.lower()))
+    compact = re.sub(r"\s+", "", query.lower())
+    if len(compact) >= 2:
+        terms.add(compact)
+    return terms
+
+
+# 간단한 어휘 일치 점수
+def _lexical_score(query_terms: set[str], text: str) -> float:
+    if not query_terms:
+        return 0.0
+    normalized_text = text.lower()
+    matched = sum(1 for term in query_terms if term in normalized_text)
+    return matched / len(query_terms)
+
+
 # payload boolean 변환
 def _as_bool(value: Any) -> bool:
     if isinstance(value, bool):
@@ -139,12 +157,14 @@ class Retriever:
     def _convert_points(
         self,
         points: list[Any],
+        query: str,
         include_noisy: bool,
         score_threshold: float | None,
         user_security_level: int,
     ) -> list[RetrievedChunk]:
         candidates: list[tuple[RetrievedChunk, str]] = []
         document_ids: set[str] = set()
+        query_terms = _query_terms(query)
 
         sorted_points = sorted(
             points,
@@ -187,7 +207,7 @@ class Retriever:
                 document_title=payload_title,
                 chunk_text=chunk_text,
                 page_numbers=_normalize_page_numbers(payload),
-                score=score,
+                score=(score * 0.85) + (_lexical_score(query_terms, chunk_text) * 0.15),
                 security_level=security_level,
                 labels=_normalize_labels(payload.get("labels")),
             )
@@ -277,6 +297,7 @@ class Retriever:
 
         converted = self._convert_points(
             points=response.points,
+            query=normalized_query,
             include_noisy=include_noisy,
             score_threshold=score_threshold,
             user_security_level=validated_user_level,
